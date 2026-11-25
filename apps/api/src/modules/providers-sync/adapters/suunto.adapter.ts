@@ -3,7 +3,7 @@ import axios, { isAxiosError } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
 
 import { ConnectorProvider, MetricType } from '@openathlete/database';
-import { mapPrismaWorkoutToDto } from '@openathlete/shared';
+import { type UnitSystem, mapPrismaWorkoutToDto } from '@openathlete/shared';
 
 import { PrismaService } from '../../prisma/services/prisma.service';
 import { createSuuntoGuideZip } from '../mapping/suunto-guide-zip';
@@ -115,9 +115,13 @@ export class SuuntoAdapter implements ProviderAdapter {
       throw new Error('Workout not found');
     }
 
-    const [metrics, zones] = await Promise.all([
+    const [metrics, zones, athlete] = await Promise.all([
       this.getMetrics(input.athleteId),
       this.getZones(input.athleteId),
+      this.prisma.athlete.findUnique({
+        where: { athleteId: input.athleteId },
+        select: { user: { select: { unitSystem: true } } },
+      }),
     ]);
 
     // Convert to DTO format
@@ -131,7 +135,12 @@ export class SuuntoAdapter implements ProviderAdapter {
       input.normalized.description ?? null,
       input.date,
       input.workoutId,
-      { metrics, zones },
+      {
+        metrics,
+        zones,
+        unitSystem:
+          (athlete?.user?.unitSystem as UnitSystem | undefined) ?? 'METRIC',
+      },
     );
 
     if (guide.steps.length === 0) {

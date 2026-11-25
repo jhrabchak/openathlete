@@ -7,6 +7,7 @@ import {
   EventWeatherSampleDto,
   SPORT_TYPE,
   TrainingZone,
+  UnitSystem,
   WorkoutDto,
 } from '@openathlete/shared';
 
@@ -80,7 +81,11 @@ export class ActivitySummaryListener {
         include: {
           event: {
             include: {
-              athlete: { include: { user: { select: { language: true } } } },
+              athlete: {
+                include: {
+                  user: { select: { language: true, unitSystem: true } },
+                },
+              },
             },
           },
           normalization: { include: { factors: true } },
@@ -148,6 +153,9 @@ export class ActivitySummaryListener {
           LANGUAGE_NAMES[
             activity.event.athlete?.user?.language ?? Language.FR
           ] ?? 'English',
+        unitSystem:
+          (activity.event.athlete?.user?.unitSystem as
+            UnitSystem | undefined) ?? 'METRIC',
         name: activity.event.name,
         sport,
         startDate: activity.event.startDate,

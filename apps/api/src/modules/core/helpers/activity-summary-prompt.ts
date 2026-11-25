@@ -2,7 +2,9 @@ import {
   ActivityStream,
   Climb,
   EventWeatherSampleDto,
+  KM_TO_MI,
   SPORT_TYPE,
+  UnitSystem,
   aerobicDecoupling,
   detectClimbs,
   detectIntervals,
@@ -10,6 +12,9 @@ import {
   formatSpeed,
   formatSpeedUnit,
   getSportConfig,
+  localSpeedUnit,
+  toUnitElevation,
+  toUnitTemperature,
 } from '@openathlete/shared';
 
 // Slower than a slow walk is standing still
@@ -146,6 +151,7 @@ export function summariseWeather(
 
 export interface ActivitySummaryInput {
   language: string;
+  unitSystem?: UnitSystem;
   name: string;
   sport: SPORT_TYPE;
   startDate: Date;
@@ -193,9 +199,24 @@ const round = (value: number, digits = 0) => value.toFixed(digits);
 export function buildActivitySummaryPrompt(
   input: ActivitySummaryInput,
 ): string {
+  const unitSystem = input.unitSystem ?? 'METRIC';
+  const imperial = unitSystem === 'IMPERIAL';
   const config = getSportConfig(input.sport);
+  const speedUnit = localSpeedUnit(config.speedUnit, unitSystem);
   const speed = (value: number) =>
-    `${formatSpeed(value, config.speedUnit)} ${formatSpeedUnit(config.speedUnit)}`;
+    `${formatSpeed(value, speedUnit)} ${formatSpeedUnit(speedUnit)}`;
+  const distance = (meters: number, digits = 2) =>
+    imperial
+      ? `${round(meters / 1609.344, digits)} mi`
+      : `${round(meters / 1000, digits)} km`;
+  const elevation = (meters: number) => {
+    const converted = toUnitElevation(meters, unitSystem);
+    return `${converted.value} ${converted.unit}`;
+  };
+  const temperature = (celsius: number) => {
+    const converted = toUnitTemperature(celsius, unitSystem);
+    return `${round(converted.value)} ${converted.unit}`;
+  };
   const lines: string[] = [];
   const add = (...items: (string | number | false | null | undefined)[]) =>
     lines.push(
@@ -212,7 +233,7 @@ export function buildActivitySummaryPrompt(
     `Name: ${input.name}`,
     `Sport: ${input.sport}`,
     `Date: ${input.startDate.toISOString().slice(0, 10)}`,
-    input.distanceM > 0 && `Distance: ${round(input.distanceM / 1000, 2)} km`,
+    input.distanceM > 0 && `Distance: ${distance(input.distanceM, 2)}`,
     `Moving time: ${formatDuration(input.movingTimeSec)}`,
     input.elapsedTimeSec - input.movingTimeSec >= 60 &&
       `Stopped: ${formatDuration(input.elapsedTimeSec - input.movingTimeSec)}`,
@@ -222,7 +243,7 @@ export function buildActivitySummaryPrompt(
     input.averageGapSpeed &&
       `Grade adjusted pace: ${speed(input.averageGapSpeed)}`,
     input.elevationGainM > 0 &&
-      `Elevation gain: ${round(input.elevationGainM)} m`,
+      `Elevation gain: ${elevation(input.elevationGainM)}`,
     input.averageHeartrate &&
       `Heart rate: ${round(input.averageHeartrate)} bpm average, ${round(input.maxHeartrate ?? 0)} max`,
     input.averageWatts &&
@@ -239,7 +260,7 @@ export function buildActivitySummaryPrompt(
       input.plan.goalDurationSec &&
         `Planned duration: ${formatDuration(input.plan.goalDurationSec)} (done ${round((input.movingTimeSec / input.plan.goalDurationSec) * 100)}%)`,
       input.plan.goalDistanceM &&
-        `Planned distance: ${round(input.plan.goalDistanceM / 1000, 2)} km (done ${round((input.distanceM / input.plan.goalDistanceM) * 100)}%)`,
+        `Planned distance: ${distance(input.plan.goalDistanceM, 2)} (done ${round((input.distanceM / input.plan.goalDistanceM) * 100)}%)`,
       'Planned workout:',
       input.plan.workout,
     );
@@ -259,7 +280,7 @@ export function buildActivitySummaryPrompt(
         .slice(0, 3)
         .map(
           (climb) =>
-            `${round(climb.lengthM / 1000, 1)} km at ${round(climb.grade * 100, 1)}% (+${round(climb.gainM)} m${climb.category ? `, category ${climb.category}` : ''})`,
+            `${distance(climb.lengthM, 1)} at ${round(climb.grade * 100, 1)}% (+${elevation(climb.gainM)}${climb.category ? `, category ${climb.category}` : ''})`,
         )
         .join('; ')}`,
     );
@@ -293,15 +314,19 @@ export function buildActivitySummaryPrompt(
   if (weather)
     add(
       [
-        weather.temperatureC !== undefined &&
-          `${round(weather.temperatureC)} °C`,
+        weather.temperatureC !== undefined && temperature(weather.temperatureC),
         weather.apparentMaxC !== undefined &&
-          `feeling up to ${round(weather.apparentMaxC)} °C`,
+          `feeling up to ${temperature(weather.apparentMaxC)}`,
         weather.humidityPct !== undefined &&
           `${round(weather.humidityPct)}% humidity`,
-        weather.windKmh !== undefined && `wind ${round(weather.windKmh)} km/h`,
+        weather.windKmh !== undefined &&
+          (imperial
+            ? `wind ${round(weather.windKmh * KM_TO_MI)} mph`
+            : `wind ${round(weather.windKmh)} km/h`),
         weather.precipitationMm &&
-          `${round(weather.precipitationMm, 1)} mm of rain`,
+          (imperial
+            ? `${round(weather.precipitationMm / 25.4, 2)} in of rain`
+            : `${round(weather.precipitationMm, 1)} mm of rain`),
       ]
         .filter(Boolean)
         .join(', '),
@@ -332,6 +357,8 @@ export function buildActivitySummaryPrompt(
     '',
     '=== LANGUAGE ===',
     `Write in ${input.language}, addressing the athlete informally.`,
+    imperial &&
+      'Use imperial units (miles, feet, min/mi or mph, °F) as shown in the facts above.',
   );
   return lines.join('\n');
 }

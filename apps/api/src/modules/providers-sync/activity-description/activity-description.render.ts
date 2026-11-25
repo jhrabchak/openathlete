@@ -1,4 +1,5 @@
 import { SportType } from '@openathlete/database';
+import { KM_TO_MI, UnitSystem, toUnitTemperature } from '@openathlete/shared';
 
 import { Language } from 'src/common/constants/languages.constant';
 
@@ -66,8 +67,11 @@ export function formatClock(seconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
 }
 
-export function formatPace(secondsPerKm: number): string {
-  return `${formatClock(secondsPerKm)} /km`;
+export function formatPace(
+  secondsPerUnit: number,
+  unitSystem: UnitSystem = 'METRIC',
+): string {
+  return `${formatClock(secondsPerUnit)} ${unitSystem === 'IMPERIAL' ? '/mi' : '/km'}`;
 }
 
 /** Shares summing to `total`, by largest remainder */
@@ -107,23 +111,33 @@ function headlineMood(facts: ActivityDescriptionFacts): HeadlineMood {
 function weatherLine(
   t: DescriptionTranslation,
   facts: ActivityDescriptionFacts,
+  unitSystem: UnitSystem,
 ): string | null {
   const w = facts.weather;
   if (!w) return null;
-  const temp = `${formatNumber(t, w.temperatureC)} °C`;
+  const tempUnit = toUnitTemperature(w.temperatureC, unitSystem);
+  const feelsUnit =
+    w.feelsLikeC !== null ? toUnitTemperature(w.feelsLikeC, unitSystem) : null;
+  const temp = `${formatNumber(t, tempUnit.value)} ${tempUnit.unit}`;
   const parts = [
-    w.feelsLikeC !== null &&
-    Math.round(w.feelsLikeC) !== Math.round(w.temperatureC)
-      ? `🌡️ ${temp} ${t.feelsLike(`${formatNumber(t, w.feelsLikeC)} °C`)}`
+    feelsUnit !== null &&
+    Math.round(feelsUnit.value) !== Math.round(tempUnit.value)
+      ? `🌡️ ${temp} ${t.feelsLike(`${formatNumber(t, feelsUnit.value)} ${feelsUnit.unit}`)}`
       : `🌡️ ${temp}`,
     t.sky[w.sky === 'clear' && !w.isDay ? 'clear-night' : w.sky],
   ];
   if (w.windKmh !== null && w.windKmh >= 1) {
+    const imperial = unitSystem === 'IMPERIAL';
+    const windSpeed = imperial ? w.windKmh * KM_TO_MI : w.windKmh;
+    const gustSpeed =
+      w.gustKmh !== null ? (imperial ? w.gustKmh * KM_TO_MI : w.gustKmh) : null;
     const gusts =
-      w.gustKmh !== null && w.gustKmh >= w.windKmh + 10
-        ? ` ${t.gusts(formatNumber(t, w.gustKmh))}`
+      w.gustKmh !== null && w.gustKmh >= w.windKmh + 10 && gustSpeed !== null
+        ? ` ${t.gusts(formatNumber(t, gustSpeed))}`
         : '';
-    parts.push(`${t.wind(formatNumber(t, w.windKmh))}${gusts}`);
+    parts.push(
+      `${t.wind(formatNumber(t, windSpeed), imperial ? 'mph' : undefined)}${gusts}`,
+    );
   }
   if (w.humidityPct !== null) {
     parts.push(t.humidity(formatNumber(t, w.humidityPct)));
@@ -142,6 +156,7 @@ function totalCost(facts: ActivityDescriptionFacts): number {
 function costLines(
   t: DescriptionTranslation,
   facts: ActivityDescriptionFacts,
+  unitSystem: UnitSystem,
 ): string[] {
   const c = facts.conditionCosts;
   if (!c || !RUNNING_SPORTS.includes(facts.sport)) return [];
@@ -164,14 +179,22 @@ function costLines(
   if (costs.length === 0) return [];
 
   const lines = [`${t.costsIntro} ${costs.join(' · ')}`];
-  const km = facts.distanceM / 1000;
-  if (km >= 1 && facts.movingTimeSec > 0) {
-    const actual = facts.movingTimeSec / km;
+  const distanceUnits =
+    unitSystem === 'IMPERIAL'
+      ? facts.distanceM / 1609.344
+      : facts.distanceM / 1000;
+  if (facts.distanceM >= 1000 && facts.movingTimeSec > 0) {
+    const actual = facts.movingTimeSec / distanceUnits;
     // Normalized as the time the activity would have taken without them, so
     // it agrees with the costs above
-    const normalized = (facts.movingTimeSec - totalCost(facts)) / km;
+    const normalized = (facts.movingTimeSec - totalCost(facts)) / distanceUnits;
     if (actual - normalized >= 1) {
-      lines.push(t.normalizedPace(formatPace(normalized), formatPace(actual)));
+      lines.push(
+        t.normalizedPace(
+          formatPace(normalized, unitSystem),
+          formatPace(actual, unitSystem),
+        ),
+      );
     }
   }
   return lines;
@@ -215,9 +238,16 @@ function decouplingLine(
   return `${t.decoupling(formatNumber(t, Math.max(0, pct), 1))} — ${verdict}`;
 }
 
-function distanceLabel(t: DescriptionTranslation, distanceM: number) {
+function distanceLabel(
+  t: DescriptionTranslation,
+  distanceM: number,
+  unitSystem: UnitSystem,
+) {
   if (Math.abs(distanceM - 21097.5) < 1) return t.halfMarathon;
   if (Math.abs(distanceM - MARATHON_M) < 1) return t.marathon;
+  if (unitSystem === 'IMPERIAL') {
+    return `${formatNumber(t, distanceM / 1609.344, 1)} mi`;
+  }
   return `${formatNumber(t, distanceM / 1000, 1)} km`;
 }
 
@@ -225,10 +255,14 @@ function durationLabel(seconds: number) {
   return seconds >= 3600 ? `${seconds / 3600} h` : `${seconds / 60} min`;
 }
 
-function personalBestLine(t: DescriptionTranslation, best: PersonalBest) {
+function personalBestLine(
+  t: DescriptionTranslation,
+  best: PersonalBest,
+  unitSystem: UnitSystem,
+) {
   return best.kind === 'distance'
     ? t.personalBest(
-        distanceLabel(t, best.distanceM),
+        distanceLabel(t, best.distanceM, unitSystem),
         formatClock(best.timeSec),
       )
     : t.powerBest(durationLabel(best.durationSec), formatNumber(t, best.watts));
@@ -285,14 +319,17 @@ function funLines(
 export function renderActivityDescription(
   facts: ActivityDescriptionFacts,
   language: string | null | undefined,
+  unitSystem: UnitSystem = 'METRIC',
 ): string | null {
   const t = translationFor(language);
   const content = [
-    weatherLine(t, facts),
-    ...costLines(t, facts),
+    weatherLine(t, facts, unitSystem),
+    ...costLines(t, facts, unitSystem),
     intensityLine(t, facts),
     decouplingLine(t, facts),
-    ...facts.personalBests.slice(0, 2).map((b) => personalBestLine(t, b)),
+    ...facts.personalBests
+      .slice(0, 2)
+      .map((b) => personalBestLine(t, b, unitSystem)),
     facts.trimp && facts.trimp >= 1
       ? t.load(formatNumber(t, Math.round(facts.trimp)))
       : null,

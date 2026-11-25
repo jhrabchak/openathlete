@@ -1,8 +1,13 @@
 import { Prisma } from '@openathlete/database';
 import {
+  M_TO_YD,
+  UnitSystem,
   WorkoutStepTargetDto,
   formatSpeed,
   getTargetIntensity,
+  localSpeedUnit,
+  toUnitElevation,
+  toUnitWeight,
 } from '@openathlete/shared';
 
 import { Language } from 'src/common/constants/languages.constant';
@@ -85,6 +90,7 @@ type FeedTarget = FeedStep['targets'][number];
 
 export interface FeedContext {
   language: Language;
+  unitSystem?: UnitSystem;
   /** The athlete's latest metric values by type */
   metrics: Record<string, number>;
   zoneNames: Map<number, string>;
@@ -342,15 +348,15 @@ export function describeFeedEvent(
   if (planned?.goalDuration) {
     facts.push(`${labels.duration}: ${formatSeconds(planned.goalDuration)}`);
   }
+  const unitSystem = context.unitSystem ?? 'METRIC';
   if (planned?.goalDistance) {
     facts.push(
-      `${labels.distance}: ${formatMeters(planned.goalDistance, context.language)}`,
+      `${labels.distance}: ${formatMeters(planned.goalDistance, context.language, unitSystem)}`,
     );
   }
   if (planned?.goalElevationGain) {
-    facts.push(
-      `${labels.elevationGain}: ${Math.round(planned.goalElevationGain)} m`,
-    );
+    const elevation = toUnitElevation(planned.goalElevationGain, unitSystem);
+    facts.push(`${labels.elevationGain}: ${elevation.value} ${elevation.unit}`);
   }
   if (planned?.goalRpe) {
     facts.push(`${labels.targetRpe}: ${formatRpe(planned.goalRpe)}`);
@@ -422,7 +428,9 @@ function stepDuration(step: FeedStep, context: FeedContext): string | null {
     case 'TIME':
       return value ? formatSeconds(value) : null;
     case 'DISTANCE':
-      return value ? formatMeters(value, context.language) : null;
+      return value
+        ? formatMeters(value, context.language, context.unitSystem)
+        : null;
     case 'REPS':
       return value ? `${value} ${labels.reps}` : null;
     case 'CALORIES':
@@ -463,14 +471,18 @@ function formatFeedTarget(
     return range && `${range} ${metricType.replaceAll('_', ' ')}`;
   }
 
+  const unitSystem = context.unitSystem ?? 'METRIC';
+  const paceUnit = localSpeedUnit('min/km', unitSystem);
   const { value, min, max } = getTargetIntensity(
     target as WorkoutStepTargetDto,
     context.metrics,
   );
   const show = (amount: number) =>
     targetType === 'PACE'
-      ? formatSpeed(amount)
-      : String(Math.round(amount * 10) / 10);
+      ? formatSpeed(amount, paceUnit)
+      : targetType === 'WEIGHT'
+        ? String(toUnitWeight(amount, unitSystem).value)
+        : String(Math.round(amount * 10) / 10);
   const amount =
     min !== null && max !== null
       ? `${show(min)} - ${show(max)}`
@@ -478,9 +490,14 @@ function formatFeedTarget(
         ? show(value)
         : null;
   if (!amount) return null;
-  return targetType === 'RPE'
-    ? `RPE ${amount}`
-    : `${amount} ${TARGET_UNITS[targetType]}`.trim();
+  if (targetType === 'RPE') return `RPE ${amount}`;
+  const unit =
+    targetType === 'PACE'
+      ? paceUnit
+      : targetType === 'WEIGHT'
+        ? toUnitWeight(0, unitSystem).unit
+        : TARGET_UNITS[targetType];
+  return `${amount} ${unit}`.trim();
 }
 
 const TARGET_UNITS: Record<string, string> = {
@@ -507,7 +524,18 @@ function formatSeconds(total: number): string {
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
-function formatMeters(meters: number, language: Language): string {
+function formatMeters(
+  meters: number,
+  language: Language,
+  unitSystem: UnitSystem = 'METRIC',
+): string {
+  if (unitSystem === 'IMPERIAL') {
+    if (meters < 1609.34) return `${Math.round(meters * M_TO_YD)} yd`;
+    const miles = new Intl.NumberFormat(LOCALES[language], {
+      maximumFractionDigits: 2,
+    }).format(meters / 1609.344);
+    return `${miles} mi`;
+  }
   if (meters < 1000) return `${Math.round(meters)} m`;
   const km = new Intl.NumberFormat(LOCALES[language], {
     maximumFractionDigits: 2,

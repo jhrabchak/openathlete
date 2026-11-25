@@ -144,6 +144,17 @@ describe('buildWeeklyRecapEmail', () => {
     expect(email.html).toContain('<html lang=');
     expect(email.text).not.toContain('undefined');
   });
+
+  it('formats distance and elevation in imperial units when requested', () => {
+    const email = buildWeeklyRecapEmail(
+      props({ language: 'EN', unitSystem: 'IMPERIAL' }),
+    );
+    expect(email.subject).toBe(
+      'Your week: 4 sessions, 26.1 mi, 6,070 ft climbed',
+    );
+    expect(email.text).toContain('Distance: 26.1 mi');
+    expect(email.text).toContain('Elevation: 6,070 ft');
+  });
 });
 
 describe('form words', () => {

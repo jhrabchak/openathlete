@@ -10,6 +10,7 @@ import {
 import {
   capitalize,
   formatDuration,
+  formatElevation,
   formatKm,
   formatNumber,
   monthName,
@@ -227,7 +228,11 @@ export function buildMonthlyRecapEmail(
   );
   const hasDistance = props.distance >= 1000;
   const subject = hasDistance
-    ? t.subject(month, formatKm(language, props.distance), sessions)
+    ? t.subject(
+        month,
+        formatKm(language, props.distance, props.unitSystem),
+        sessions,
+      )
     : t.subjectNoDistance(month, sessions);
 
   let comparison: string | null = null;
@@ -254,7 +259,10 @@ export function buildMonthlyRecapEmail(
         paragraph(greeting(language, props.name)),
         stats([
           { label: t.labels[0], value: formatNumber(language, props.count) },
-          { label: t.labels[1], value: formatKm(language, props.distance) },
+          {
+            label: t.labels[1],
+            value: formatKm(language, props.distance, props.unitSystem),
+          },
         ]),
         stats([
           {
@@ -263,7 +271,11 @@ export function buildMonthlyRecapEmail(
           },
           {
             label: t.labels[3],
-            value: `${formatNumber(language, props.elevationGain)} m`,
+            value: formatElevation(
+              language,
+              props.elevationGain,
+              props.unitSystem,
+            ),
           },
         ]),
         ...(comparison ? [paragraph(comparison)] : []),
@@ -272,7 +284,7 @@ export function buildMonthlyRecapEmail(
               paragraph(
                 t.longest(
                   props.longest.name,
-                  formatKm(language, props.longest.distance),
+                  formatKm(language, props.longest.distance, props.unitSystem),
                 ),
               ),
             ]

@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 
 import { AthleteInjury, Prisma } from '@openathlete/database';
 import { InputJsonValue } from '@openathlete/database/generated/client/runtime/library';
-import { AiTask } from '@openathlete/shared';
+import { AiTask, UnitSystem, toUnitElevation } from '@openathlete/shared';
 
 import { Language } from 'src/common/constants/languages.constant';
 import { formatRpe } from 'src/common/utils/rpe';
@@ -66,6 +66,7 @@ export class ActivityFeedbackListener {
                   user: {
                     select: {
                       language: true,
+                      unitSystem: true,
                     },
                   },
                 },
@@ -86,6 +87,21 @@ export class ActivityFeedbackListener {
 
       const athleteId = activity.event.athleteId;
       const userLanguage = activity.event.athlete.user?.language ?? Language.FR;
+      const unitSystem =
+        (activity.event.athlete.user?.unitSystem as UnitSystem | undefined) ??
+        'METRIC';
+      const imperial = unitSystem === 'IMPERIAL';
+      const formatDist = (meters: number | null | undefined) =>
+        meters === null || meters === undefined
+          ? 'n/a'
+          : imperial
+            ? `${(meters / 1609.344).toFixed(2)} mi`
+            : `${(meters / 1000).toFixed(2)} km`;
+      const formatElev = (meters: number | null | undefined) => {
+        if (meters === null || meters === undefined) return 'n/a';
+        const converted = toUnitElevation(meters, unitSystem);
+        return `${converted.value} ${converted.unit}`;
+      };
 
       const model = await this.aiModelResolver.tryResolveForAthlete(
         AiTask.POST_ACTIVITY_QUESTIONS,
@@ -153,9 +169,9 @@ export class ActivityFeedbackListener {
       const training = activity.relatedTraining;
       const competition = activity.relatedCompetition;
       const goalSummary = training
-        ? `Target distance: ${training.goalDistance ?? 'n/a'} m, Target elevation gain: ${training.goalElevationGain ?? 'n/a'} m, Target duration: ${training.goalDuration ?? 'n/a'} s, Target RPE: ${rpeOrNa(training.goalRpe)}`
+        ? `Target distance: ${formatDist(training.goalDistance)}, Target elevation gain: ${formatElev(training.goalElevationGain)}, Target duration: ${training.goalDuration ?? 'n/a'} s, Target RPE: ${rpeOrNa(training.goalRpe)}`
         : competition
-          ? `Target distance: ${competition.goalDistance ?? 'n/a'} m, Target elevation gain: ${competition.goalElevationGain ?? 'n/a'} m, Target duration: ${competition.goalDuration ?? 'n/a'} s, Target RPE: ${rpeOrNa(competition.goalRpe)}`
+          ? `Target distance: ${formatDist(competition.goalDistance)}, Target elevation gain: ${formatElev(competition.goalElevationGain)}, Target duration: ${competition.goalDuration ?? 'n/a'} s, Target RPE: ${rpeOrNa(competition.goalRpe)}`
           : 'No goals specified';
 
       const injuriesSummary =
@@ -178,12 +194,12 @@ export class ActivityFeedbackListener {
         '',
         'PLANNED (if available):',
         training
-          ? `- Target distance: ${training.goalDistance ?? 'n/a'} m\n- Target elevation gain: ${training.goalElevationGain ?? 'n/a'} m\n- Target duration: ${training.goalDuration ?? 'n/a'} s\n- Target RPE: ${rpeOrNa(training.goalRpe)}`
+          ? `- Target distance: ${formatDist(training.goalDistance)}\n- Target elevation gain: ${formatElev(training.goalElevationGain)}\n- Target duration: ${training.goalDuration ?? 'n/a'} s\n- Target RPE: ${rpeOrNa(training.goalRpe)}`
           : 'No planned training linked to this activity.',
         '',
         'COMPLETED:',
-        `- Distance: ${activity.distance} m`,
-        `- Elevation gain: ${activity.elevationGain} m`,
+        `- Distance: ${formatDist(activity.distance)}`,
+        `- Elevation gain: ${formatElev(activity.elevationGain)}`,
         `- Duration (moving_time): ${activity.movingTime} s`,
         `- Actual RPE: ${rpeOrNa(activity.rpe)}`,
         `- Average HR: ${activity.averageHeartrate ?? 'n/a'} bpm`,
@@ -220,6 +236,11 @@ export class ActivityFeedbackListener {
         `=== LANGUAGE REQUIREMENT ===`,
         `IMPORTANT: Generate all questions and QCM option labels in ${targetLanguage} (${userLanguage}).`,
         `Use ${({ French: 'tu', Italian: 'tu', Spanish: 'tú', English: 'you', 'Portuguese (Brazil)': 'você', German: 'du', Polish: 'ty', Dutch: 'je' } as Record<string, string>)[targetLanguage]} form, direct and friendly coaching style.`,
+        ...(imperial
+          ? [
+              'Use imperial units (miles, feet, min/mi or mph, °F) if mentioning distances, elevation or pace.',
+            ]
+          : []),
       ].join('\n');
 
       const { questions } = await this.aiService.generateObject(

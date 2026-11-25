@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 
 import { EventType } from '@openathlete/database';
-import { ApiEnvSchemaType } from '@openathlete/shared';
+import { ApiEnvSchemaType, UnitSystem } from '@openathlete/shared';
 
 import { Language } from 'src/common/constants/languages.constant';
 import { formatZoned, validTimeZone } from 'src/common/utils/time-zone';
@@ -87,7 +87,7 @@ export class CalendarFeedService {
       where: { calendarFeedToken: token },
       select: {
         athleteId: true,
-        user: { select: { language: true, timeZone: true } },
+        user: { select: { language: true, timeZone: true, unitSystem: true } },
       },
     });
     if (!athlete) {
@@ -123,6 +123,7 @@ export class CalendarFeedService {
     ]);
 
     const language = athlete.user.language as Language;
+    const unitSystem = athlete.user.unitSystem as UnitSystem;
     const timeZone = validTimeZone(athlete.user.timeZone);
     const metricValues = Object.fromEntries(
       metrics.map(({ type, value }) => [type, value]),
@@ -143,6 +144,7 @@ export class CalendarFeedService {
         : null;
       const { description, categories } = describeFeedEvent(event, {
         language,
+        unitSystem,
         metrics: metricValues,
         zoneNames,
         url,

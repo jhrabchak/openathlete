@@ -35,6 +35,11 @@ const contextOutput = z.object({
     name: z.string(),
     gender: z.string().optional(),
     timeZone: z.string(),
+    unitSystem: z
+      .enum(['METRIC', 'IMPERIAL'])
+      .describe(
+        "The athlete's preferred display unit system (tool numbers stay metric)",
+      ),
     today: z.string().describe("Today's date in the athlete's time zone"),
     weekday: z.string(),
     isYou: z.boolean(),
@@ -207,6 +212,7 @@ export const registerAthleteTools: ToolRegistrar = (server, ctx, deps) => {
               user: {
                 select: {
                   gender: true,
+                  unitSystem: true,
                   practicedSports: true,
                   trainingGoal: true,
                   weeklyTrainingHours: true,
@@ -282,6 +288,7 @@ export const registerAthleteTools: ToolRegistrar = (server, ctx, deps) => {
             name: scope.name,
             ...(profile.user.gender && { gender: profile.user.gender }),
             timeZone: scope.timeZone,
+            unitSystem: profile.user.unitSystem,
             today: scope.today,
             weekday: WEEKDAYS[new Date(`${scope.today}T12:00:00Z`).getUTCDay()],
             isYou: scope.isSelf,

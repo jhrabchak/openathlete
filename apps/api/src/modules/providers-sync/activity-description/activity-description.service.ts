@@ -10,6 +10,7 @@ import {
   RecordType,
   TrainingLoadCalculationType,
 } from '@openathlete/database';
+import type { UnitSystem } from '@openathlete/shared';
 
 import { PrismaService } from 'src/modules/prisma/services/prisma.service';
 
@@ -264,7 +265,9 @@ export class ActivityDescriptionService {
     const account = await this.prisma.providerAccount.findUnique({
       where: { providerAccountId: job.providerAccountId },
       include: {
-        athlete: { include: { user: { select: { language: true } } } },
+        athlete: {
+          include: { user: { select: { language: true, unitSystem: true } } },
+        },
       },
     });
     // Turned off or disconnected since the job was queued
@@ -280,7 +283,10 @@ export class ActivityDescriptionService {
     const facts = await this.buildFacts(job.eventActivityId);
     const language =
       account.activityDescriptionLanguage ?? account.athlete.user.language;
-    const block = facts && renderActivityDescription(facts, language);
+    const unitSystem =
+      (account.athlete.user.unitSystem as UnitSystem | undefined) ?? 'METRIC';
+    const block =
+      facts && renderActivityDescription(facts, language, unitSystem);
     if (!block) return 'nothing-to-say';
 
     try {
@@ -317,6 +323,7 @@ export class ActivityDescriptionService {
   async preview(
     athleteId: number,
     language: string | null | undefined,
+    unitSystem: UnitSystem = 'METRIC',
   ): Promise<string | null> {
     const recent = await this.prisma.eventActivity.findMany({
       where: { event: { athleteId, type: EventType.ACTIVITY } },
@@ -326,7 +333,8 @@ export class ActivityDescriptionService {
     });
     for (const { eventActivityId } of recent) {
       const facts = await this.buildFacts(eventActivityId);
-      const text = facts && renderActivityDescription(facts, language);
+      const text =
+        facts && renderActivityDescription(facts, language, unitSystem);
       if (text) return text;
     }
     return null;

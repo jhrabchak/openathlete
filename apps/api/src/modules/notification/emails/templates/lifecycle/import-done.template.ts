@@ -216,7 +216,7 @@ export function buildImportDoneEmail(
                 },
                 {
                   label: t.labels[1],
-                  value: formatKm(language, weeks.distance),
+                  value: formatKm(language, weeks.distance, props.unitSystem),
                 },
                 {
                   label: t.labels[2],

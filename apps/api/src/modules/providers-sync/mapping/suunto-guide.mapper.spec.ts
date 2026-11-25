@@ -230,4 +230,49 @@ describe('mapWorkoutDtoToSuuntoGuide', () => {
     // track running are left out, the Guides API refuses them
     expect(guide.activities).toEqual([22, 1, 53, 59, 60]);
   });
+
+  it('writes imperial labels while keeping Suunto protocol fields in SI', () => {
+    const runGuide = guideOf(
+      [
+        step({
+          durationType: 'DISTANCE',
+          durationValue: 1609.344,
+          targets: [{ targetType: 'ZONE', targetValue: 3 }],
+        } as Partial<WorkoutStepDto>),
+      ],
+      SportType.RUNNING,
+      {
+        unitSystem: 'IMPERIAL',
+        zones: [
+          {
+            trainingZoneId: 3,
+            type: 'PACE',
+            values: [{ min: 4, max: 4.5, sports: [SportType.RUNNING] }],
+          },
+        ],
+      },
+    );
+    const runStep = fieldsStep(runGuide.steps[0]);
+    expect(runStep.fields[0]).toEqual({
+      type: 'targetPace',
+      min: 3.704,
+      max: 4.167,
+    });
+    expect(runStep.notification?.text).toBe('1 mi · 6:26-7:14/mi');
+
+    const bikeGuide = guideOf(
+      [
+        step({
+          durationType: 'DISTANCE',
+          durationValue: 400,
+          targets: [{ targetType: 'PACE', targetValue: 10 }],
+        } as Partial<WorkoutStepDto>),
+      ],
+      SportType.CYCLING,
+      { unitSystem: 'IMPERIAL' },
+    );
+    const bikeStep = fieldsStep(bikeGuide.steps[0]);
+    expect(bikeStep.fields[0]).toEqual({ type: 'targetSpeed', value: 10 });
+    expect(bikeStep.notification?.text).toBe('437 yd · 22.4 mph');
+  });
 });

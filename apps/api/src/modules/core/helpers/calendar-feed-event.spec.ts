@@ -192,4 +192,47 @@ describe('describeFeedEvent', () => {
       }).description,
     ).toBeNull();
   });
+
+  it('formats distance, elevation, pace and weight in imperial units', () => {
+    const { description } = describeFeedEvent(
+      event({
+        training: training({
+          goalDistance: 16093.44,
+          goalElevationGain: 100,
+          workout: {
+            steps: [
+              step({
+                stepType: 'INTERVAL_ACTIVE',
+                durationType: 'DISTANCE',
+                durationValue: 400,
+                targets: [
+                  {
+                    targetType: 'PACE',
+                    targetMin: 0.9,
+                    targetMax: 1,
+                    targetValue: null,
+                    metricType: 'VMA',
+                  },
+                  {
+                    targetType: 'WEIGHT',
+                    targetMin: null,
+                    targetMax: null,
+                    targetValue: 100,
+                    metricType: null,
+                  },
+                ],
+              }),
+            ],
+          },
+        }),
+      }),
+      { ...context, unitSystem: 'IMPERIAL', url: null },
+    );
+
+    expect(description).toContain('Distance: 10 mi');
+    expect(description).toContain('Elevation gain: 328 ft');
+    expect(description).toContain('437 yd');
+    expect(description).toContain('min/mi');
+    expect(description).toContain('220.5 lb');
+  });
 });

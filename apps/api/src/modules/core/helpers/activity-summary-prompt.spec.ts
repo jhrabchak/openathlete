@@ -150,4 +150,27 @@ describe('buildActivitySummaryPrompt', () => {
     expect(prompt).toContain('Nothing notable, or no detailed recording.');
     expect(prompt).not.toContain("ATHLETE'S OWN WORDS");
   });
+
+  it('writes facts in imperial units when the athlete prefers imperial', () => {
+    const prompt = buildActivitySummaryPrompt({
+      ...input,
+      language: 'English',
+      unitSystem: 'IMPERIAL',
+      weather: {
+        temperatureC: 20,
+        apparentMaxC: 25,
+        humidityPct: 50,
+        windKmh: 16,
+        precipitationMm: 2.54,
+      },
+    });
+    expect(prompt).toContain('Distance: 7.46 mi');
+    expect(prompt).toContain('Average pace: 6:42 min/mi');
+    expect(prompt).toContain('Elevation gain: 262 ft');
+    expect(prompt).toContain('68 °F');
+    expect(prompt).toContain('feeling up to 77 °F');
+    expect(prompt).toContain('wind 10 mph');
+    expect(prompt).toContain('0.10 in of rain');
+    expect(prompt).toContain('Use imperial units');
+  });
 });

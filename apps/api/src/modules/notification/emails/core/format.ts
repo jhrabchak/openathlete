@@ -1,4 +1,8 @@
-import type { EmailLanguage } from '@openathlete/shared';
+import {
+  type EmailLanguage,
+  M_TO_FT,
+  type UnitSystem,
+} from '@openathlete/shared';
 
 const locales: Record<EmailLanguage, string> = {
   FR: 'fr-FR',
@@ -21,10 +25,30 @@ export function formatNumber(
   }).format(value);
 }
 
-/** Meters as kilometers: one decimal under 100 km, none above */
-export function formatKm(language: EmailLanguage, meters: number) {
+/** Meters as kilometers or miles: one decimal under 100, none above */
+export function formatKm(
+  language: EmailLanguage,
+  meters: number,
+  unitSystem: UnitSystem = 'METRIC',
+) {
+  if (unitSystem === 'IMPERIAL') {
+    const miles = meters / 1609.344;
+    return `${formatNumber(language, miles, miles < 100 ? 1 : 0)} mi`;
+  }
   const km = meters / 1000;
   return `${formatNumber(language, km, km < 100 ? 1 : 0)} km`;
+}
+
+/** Elevation in meters or feet */
+export function formatElevation(
+  language: EmailLanguage,
+  meters: number,
+  unitSystem: UnitSystem = 'METRIC',
+) {
+  if (unitSystem === 'IMPERIAL') {
+    return `${formatNumber(language, Math.round(meters * M_TO_FT))} ft`;
+  }
+  return `${formatNumber(language, Math.round(meters))} m`;
 }
 
 export function formatDuration(language: EmailLanguage, seconds: number) {

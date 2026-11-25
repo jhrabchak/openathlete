@@ -189,6 +189,21 @@ describe('renderActivityDescription', () => {
       }
     }
   });
+
+  it('formats weather, pace and personal best distances in imperial units', () => {
+    const text = renderActivityDescription(
+      {
+        ...hotRun,
+        personalBests: [{ kind: 'distance', distanceM: 5000, timeSec: 1361 }],
+      },
+      Language.EN,
+      'IMPERIAL',
+    )!;
+    expect(text).toContain('🌡️ 81 °F (feels like 85 °F)');
+    expect(text).toContain('💨 Wind 7 mph (gusts 19)');
+    expect(text).toContain('🎯 Normalized pace: 7:48 /mi (actual 8:19 /mi)');
+    expect(text).toContain('🏅 Personal best — 3.1 mi: 22:41');
+  });
 });
 
 describe('mergeDescription', () => {

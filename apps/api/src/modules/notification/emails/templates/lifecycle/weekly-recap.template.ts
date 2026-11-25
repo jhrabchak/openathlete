@@ -1,4 +1,4 @@
-import type { EmailLanguage } from '@openathlete/shared';
+import { type EmailLanguage, M_TO_FT } from '@openathlete/shared';
 
 import {
   Block,
@@ -15,6 +15,7 @@ import {
 import {
   capitalize,
   formatDuration,
+  formatElevation,
   formatKm,
   formatNumber,
   formatWeekday,
@@ -34,7 +35,7 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} ${done > 1 ? 'séances' : 'séance'} sur ${planned} ${planned > 1 ? 'prévues' : 'prévue'}`,
     sessions: (n: number) => (n === 1 ? '1 séance' : `${n} séances`),
-    elevation: (m: string) => `${m} m D+`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') => `${value} ${unit} D+`,
     rest: 'une semaine de repos',
     preview: 'La semaine passée, ta forme, et ce qui vient.',
     title: 'Ta semaine',
@@ -88,7 +89,8 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} of ${planned} planned ${planned > 1 ? 'sessions' : 'session'}`,
     sessions: (n: number) => (n === 1 ? '1 session' : `${n} sessions`),
-    elevation: (m: string) => `${m} m climbed`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') =>
+      `${value} ${unit} climbed`,
     rest: 'a week of rest',
     preview: 'Last week, your form, and what comes next.',
     title: 'Your week',
@@ -141,7 +143,7 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} ${done === 1 ? 'sessione' : 'sessioni'} su ${planned} ${planned > 1 ? 'previste' : 'prevista'}`,
     sessions: (n: number) => (n === 1 ? '1 sessione' : `${n} sessioni`),
-    elevation: (m: string) => `${m} m D+`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') => `${value} ${unit} D+`,
     rest: 'una settimana di riposo',
     preview: 'La settimana passata, la tua forma, e quello che viene.',
     title: 'La tua settimana',
@@ -195,7 +197,7 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} ${done === 1 ? 'sesión' : 'sesiones'} de ${planned} ${planned > 1 ? 'previstas' : 'prevista'}`,
     sessions: (n: number) => (n === 1 ? '1 sesión' : `${n} sesiones`),
-    elevation: (m: string) => `${m} m D+`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') => `${value} ${unit} D+`,
     rest: 'una semana de descanso',
     preview: 'La semana pasada, tu forma y lo que viene.',
     title: 'Tu semana',
@@ -249,7 +251,8 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} de ${planned} ${planned > 1 ? 'treinos previstos' : 'treino previsto'}`,
     sessions: (n: number) => (n === 1 ? '1 treino' : `${n} treinos`),
-    elevation: (m: string) => `${m} m de subida`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') =>
+      `${value} ${unit} de subida`,
     rest: 'uma semana de descanso',
     preview: 'A semana passada, sua forma e o que vem por aí.',
     title: 'Sua semana',
@@ -302,7 +305,8 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} von ${planned} geplanten ${planned > 1 ? 'Einheiten' : 'Einheit'}`,
     sessions: (n: number) => (n === 1 ? '1 Einheit' : `${n} Einheiten`),
-    elevation: (m: string) => `${m} Hm`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') =>
+      unit === 'ft' ? `${value} ft` : `${value} Hm`,
     rest: 'eine Woche Pause',
     preview: 'Die letzte Woche, deine Form und was kommt.',
     title: 'Deine Woche',
@@ -357,7 +361,8 @@ const translations = {
       `${done} z ${planned} ${planned > 1 ? 'zaplanowanych treningów' : 'zaplanowanego treningu'}`,
     sessions: (n: number) =>
       `${n} ${polishPlural(n, 'trening', 'treningi', 'treningów')}`,
-    elevation: (m: string) => `${m} m przewyższenia`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') =>
+      `${value} ${unit} przewyższenia`,
     rest: 'tydzień odpoczynku',
     preview: 'Miniony tydzień, Twoja forma i to, co przed Tobą.',
     title: 'Twój tydzień',
@@ -411,7 +416,8 @@ const translations = {
     plannedFigure: (done: number, planned: number) =>
       `${done} van ${planned} geplande ${planned > 1 ? 'trainingen' : 'training'}`,
     sessions: (n: number) => (n === 1 ? '1 training' : `${n} trainingen`),
-    elevation: (m: string) => `${m} hoogtemeters`,
+    elevation: (value: string, unit: 'm' | 'ft' = 'm') =>
+      unit === 'ft' ? `${value} ft` : `${value} hoogtemeters`,
     rest: 'een rustweek',
     preview: 'Afgelopen week, je vorm en wat er komt.',
     title: 'Je week',
@@ -522,14 +528,22 @@ function signed(value: number) {
 
 /** The figure of the week, for the subject */
 function figure(props: WeeklyRecapProps) {
-  const { language, past } = props;
+  const { language, past, unitSystem = 'METRIC' } = props;
   const t = translations[language];
   if (past.planned > 0) return t.plannedFigure(past.done, past.planned);
   if (past.count === 0) return t.rest;
   const parts = [t.sessions(past.count)];
-  if (past.distance >= 1000) parts.push(formatKm(language, past.distance));
+  if (past.distance >= 1000) {
+    parts.push(formatKm(language, past.distance, unitSystem));
+  }
   if (past.elevationGain >= 50) {
-    parts.push(t.elevation(formatNumber(language, past.elevationGain)));
+    const imperial = unitSystem === 'IMPERIAL';
+    const gain = imperial
+      ? Math.round(past.elevationGain * M_TO_FT)
+      : past.elevationGain;
+    parts.push(
+      t.elevation(formatNumber(language, gain), imperial ? 'ft' : 'm'),
+    );
   }
   return parts.join(', ');
 }
@@ -582,11 +596,15 @@ export function buildWeeklyRecapEmail(props: WeeklyRecapProps): LifecycleEmail {
         stats([
           {
             label: t.labels.distance,
-            value: formatKm(language, past.distance),
+            value: formatKm(language, past.distance, props.unitSystem),
           },
           {
             label: t.labels.elevation,
-            value: `${formatNumber(language, past.elevationGain)} m`,
+            value: formatElevation(
+              language,
+              past.elevationGain,
+              props.unitSystem,
+            ),
           },
         ]),
       );

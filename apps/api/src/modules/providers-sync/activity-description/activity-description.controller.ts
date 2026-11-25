@@ -19,6 +19,7 @@ import { ConnectorProvider } from '@openathlete/database';
 import {
   ActivityDescriptionPreviewQueryDto,
   ActivityDescriptionPreviewResponseDto,
+  UnitSystem,
   activityDescriptionPreviewQuerySchema,
 } from '@openathlete/shared';
 
@@ -58,7 +59,7 @@ export class ActivityDescriptionController {
       where: { userId: user.userId },
       select: {
         athleteId: true,
-        user: { select: { language: true } },
+        user: { select: { language: true, unitSystem: true } },
         providerAccounts: {
           where: { provider: ConnectorProvider.STRAVA },
           select: { activityDescriptionLanguage: true },
@@ -71,8 +72,13 @@ export class ActivityDescriptionController {
       query.language ??
       athlete.providerAccounts[0]?.activityDescriptionLanguage ??
       athlete.user.language;
+    const unitSystem = athlete.user.unitSystem as UnitSystem;
     return {
-      description: await this.descriptions.preview(athlete.athleteId, language),
+      description: await this.descriptions.preview(
+        athlete.athleteId,
+        language,
+        unitSystem,
+      ),
     };
   }
 }

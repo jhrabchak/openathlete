@@ -11,8 +11,8 @@ export type DescriptionTranslation = {
   headlines: Record<HeadlineMood, string[]>;
   sky: Record<WeatherSummary['sky'] | 'clear-night', string>;
   feelsLike: (t: string) => string;
-  wind: (kmh: string) => string;
-  gusts: (kmh: string) => string;
+  wind: (speed: string, unit?: string) => string;
+  gusts: (speed: string) => string;
   humidity: (pct: string) => string;
   costsIntro: string;
   heat: string;
@@ -86,7 +86,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Neige',
       },
       feelsLike: (t) => `(ressenti ${t})`,
-      wind: (kmh) => `💨 Vent ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Vent ${speed} ${unit}`,
       gusts: (kmh) => `(rafales ${kmh})`,
       humidity: (pct) => `💧 Humidité ${pct} %`,
       costsIntro: '⏱️ Ce que les conditions t’ont coûté :',
@@ -146,7 +146,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Snow',
       },
       feelsLike: (t) => `(feels like ${t})`,
-      wind: (kmh) => `💨 Wind ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Wind ${speed} ${unit}`,
       gusts: (kmh) => `(gusts ${kmh})`,
       humidity: (pct) => `💧 Humidity ${pct}%`,
       costsIntro: '⏱️ What the conditions cost you:',
@@ -211,7 +211,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Neve',
       },
       feelsLike: (t) => `(percepita ${t})`,
-      wind: (kmh) => `💨 Vento ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Vento ${speed} ${unit}`,
       gusts: (kmh) => `(raffiche ${kmh})`,
       humidity: (pct) => `💧 Umidità ${pct} %`,
       costsIntro: '⏱️ Quanto ti sono costate le condizioni:',
@@ -272,7 +272,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Nieve',
       },
       feelsLike: (t) => `(sensación ${t})`,
-      wind: (kmh) => `💨 Viento ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Viento ${speed} ${unit}`,
       gusts: (kmh) => `(rachas ${kmh})`,
       humidity: (pct) => `💧 Humedad ${pct} %`,
       costsIntro: '⏱️ Lo que te costaron las condiciones:',
@@ -332,7 +332,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Neve',
       },
       feelsLike: (t) => `(sensação ${t})`,
-      wind: (kmh) => `💨 Vento ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Vento ${speed} ${unit}`,
       gusts: (kmh) => `(rajadas ${kmh})`,
       humidity: (pct) => `💧 Umidade ${pct} %`,
       costsIntro: '⏱️ O que as condições te custaram:',
@@ -401,7 +401,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Schnee',
       },
       feelsLike: (t) => `(gefühlt ${t})`,
-      wind: (kmh) => `💨 Wind ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Wind ${speed} ${unit}`,
       gusts: (kmh) => `(Böen ${kmh})`,
       humidity: (pct) => `💧 Luftfeuchtigkeit ${pct} %`,
       costsIntro: '⏱️ Was dich die Bedingungen gekostet haben:',
@@ -467,7 +467,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Śnieg',
       },
       feelsLike: (t) => `(odczuwalna ${t})`,
-      wind: (kmh) => `💨 Wiatr ${kmh} km/h`,
+      wind: (speed, unit = 'km/h') => `💨 Wiatr ${speed} ${unit}`,
       gusts: (kmh) => `(porywy ${kmh})`,
       humidity: (pct) => `💧 Wilgotność ${pct} %`,
       costsIntro: '⏱️ Ile kosztowały cię warunki:',
@@ -536,7 +536,7 @@ export const descriptionTranslations: Record<Language, DescriptionTranslation> =
         snow: '🌨️ Sneeuw',
       },
       feelsLike: (t) => `(gevoelstemperatuur ${t})`,
-      wind: (kmh) => `💨 Wind ${kmh} km/u`,
+      wind: (speed, unit = 'km/u') => `💨 Wind ${speed} ${unit}`,
       gusts: (kmh) => `(windstoten ${kmh})`,
       humidity: (pct) => `💧 Luchtvochtigheid ${pct}%`,
       costsIntro: '⏱️ Wat de omstandigheden je hebben gekost:',

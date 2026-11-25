@@ -11,6 +11,7 @@ import {
   ApiEnvSchemaType,
   EmailLanguage,
   SUPPORTER_GOAL,
+  UnitSystem,
 } from '@openathlete/shared';
 
 import { maskEmail } from 'src/common/utils/mask-email';
@@ -222,6 +223,7 @@ export class WeeklyEmailService {
         email: true,
         firstName: true,
         language: true,
+        unitSystem: true,
         timeZone: true,
         emailWeekly: true,
         emailNewsConsentAt: true,
@@ -277,6 +279,7 @@ export class WeeklyEmailService {
       const link = (url: string) => campaignLink(url, KIND);
       const email = buildWeeklyRecapEmail({
         language,
+        unitSystem: user.unitSystem as UnitSystem,
         name: user.firstName || undefined,
         signature,
         footer: listFooter(config, userId, 'weekly', language),
@@ -359,6 +362,7 @@ export class WeeklyEmailService {
         email: true,
         firstName: true,
         language: true,
+        unitSystem: true,
         timeZone: true,
         emailCoachWeekly: true,
         coachAthletes: {

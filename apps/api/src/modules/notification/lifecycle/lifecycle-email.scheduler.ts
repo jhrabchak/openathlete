@@ -8,7 +8,11 @@ import {
   SubscriptionPlan,
   SubscriptionStatus,
 } from '@openathlete/database';
-import { ApiEnvSchemaType, EmailLanguage } from '@openathlete/shared';
+import {
+  ApiEnvSchemaType,
+  EmailLanguage,
+  UnitSystem,
+} from '@openathlete/shared';
 
 import { maskEmail } from 'src/common/utils/mask-email';
 import { validTimeZone, zonedClock } from 'src/common/utils/time-zone';
@@ -54,6 +58,7 @@ const userSelect = {
   email: true,
   firstName: true,
   language: true,
+  unitSystem: true,
   timeZone: true,
   createdAt: true,
   emailTips: true,
@@ -333,6 +338,7 @@ export class LifecycleEmailScheduler {
       : { kind: 'account' };
     const base: LifecycleEmailProps = {
       language,
+      unitSystem: user.unitSystem as UnitSystem,
       name: user.firstName || undefined,
       signature,
       footer,

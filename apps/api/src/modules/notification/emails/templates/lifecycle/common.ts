@@ -1,10 +1,11 @@
-import type { EmailLanguage } from '@openathlete/shared';
+import type { EmailLanguage, UnitSystem } from '@openathlete/shared';
 
 import { EmailFooter, RenderedEmail } from '../../core/layout';
 
 /** What every email of the sequences receives */
 export interface LifecycleEmailProps {
   language: EmailLanguage;
+  unitSystem?: UnitSystem;
   name?: string;
   /** Who signs */
   signature: string;

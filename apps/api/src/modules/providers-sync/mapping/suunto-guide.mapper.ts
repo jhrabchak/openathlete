@@ -1,10 +1,12 @@
 import { SportType } from '@openathlete/database';
 import type {
+  UnitSystem,
   WorkoutDto,
   WorkoutStepDto,
   WorkoutStepTargetDto,
 } from '@openathlete/shared';
 import {
+  M_TO_YD,
   WORKOUT_DURATION_TYPE,
   WORKOUT_STEP_TYPE,
   WORKOUT_TARGET_TYPE,
@@ -43,6 +45,7 @@ export interface SuuntoZone {
 export interface SuuntoGuideContext {
   metrics?: SuuntoMetrics;
   zones?: SuuntoZone[];
+  unitSystem?: UnitSystem;
 }
 
 const RUNNING_SPORTS: SportType[] = [
@@ -84,9 +87,14 @@ function paceToSpeed(minutesPerKm: number): number {
   return 1000 / (minutesPerKm * 60);
 }
 
-function formatPace(speed: number, sport: SportType): string {
+function formatPace(
+  speed: number,
+  sport: SportType,
+  unitSystem: UnitSystem = 'METRIC',
+): string {
   const swim = sport === SportType.SWIMMING;
-  const seconds = Math.round((swim ? 100 : 1000) / speed);
+  const distance = swim ? 100 : unitSystem === 'IMPERIAL' ? 1609.344 : 1000;
+  const seconds = Math.round(distance / speed);
   const minutes = Math.floor(seconds / 60);
   const rest = String(seconds % 60).padStart(2, '0');
   return `${minutes}:${rest}`;
@@ -102,7 +110,15 @@ function formatClock(totalSeconds: number): string {
     : `${minutes}:${rest}`;
 }
 
-function formatDistance(meters: number): string {
+function formatDistance(
+  meters: number,
+  unitSystem: UnitSystem = 'METRIC',
+): string {
+  if (unitSystem === 'IMPERIAL') {
+    return meters >= 1609.34
+      ? `${round(meters / 1609.344, 2)} mi`
+      : `${round(meters * M_TO_YD)} yd`;
+  }
   return meters >= 1000
     ? `${round(meters / 1000, 2)} km`
     : `${round(meters)} m`;
@@ -188,24 +204,44 @@ function speedTarget(
   max: number | null,
   value: number | null,
   sport: SportType,
+  unitSystem: UnitSystem = 'METRIC',
 ): MappedTarget {
   const target = bounds(min, max, value);
   if (!target || !within(target, 0.2, 30)) return NO_TARGET;
   const rounded = mapBounds(target, (speed) => round(speed, 3));
   const asPace = RUNNING_SPORTS.includes(sport) || sport === SportType.SWIMMING;
   if (!asPace) {
+    if (unitSystem === 'IMPERIAL') {
+      return {
+        field: { type: 'targetSpeed', ...rounded },
+        label: describeBounds(
+          rounded,
+          (speed) => round((speed * 3600) / 1609.344, 1),
+          ' mph',
+        ),
+      };
+    }
     return {
       field: { type: 'targetSpeed', ...rounded },
       label: describeBounds(rounded, (speed) => round(speed * 3.6, 1), ' km/h'),
     };
   }
-  const unit = sport === SportType.SWIMMING ? '/100m' : '/km';
+  const unit =
+    sport === SportType.SWIMMING
+      ? '/100m'
+      : unitSystem === 'IMPERIAL'
+        ? '/mi'
+        : '/km';
   // The faster speed is the lower pace
   const paces: Bounds =
     'value' in rounded ? rounded : { min: rounded.max, max: rounded.min };
   return {
     field: { type: 'targetPace', ...rounded },
-    label: describeBounds(paces, (speed) => formatPace(speed, sport), unit),
+    label: describeBounds(
+      paces,
+      (speed) => formatPace(speed, sport, unitSystem),
+      unit,
+    ),
   };
 }
 
@@ -229,7 +265,7 @@ export function mapTargetToSuunto(
   if (!target || target.targetType === WORKOUT_TARGET_TYPE.OPEN) {
     return NO_TARGET;
   }
-  const { metrics, zones = [] } = context;
+  const { metrics, zones = [], unitSystem = 'METRIC' } = context;
 
   switch (target.targetType) {
     case WORKOUT_TARGET_TYPE.ZONE: {
@@ -244,6 +280,7 @@ export function mapTargetToSuunto(
           paceToSpeed(value.min),
           null,
           sport,
+          unitSystem,
         );
       }
       return zone.type === 'POWER'
@@ -266,7 +303,13 @@ export function mapTargetToSuunto(
       if (target.targetType === WORKOUT_TARGET_TYPE.POWER) {
         return powerTarget(intensity.min, intensity.max, intensity.value);
       }
-      return speedTarget(intensity.min, intensity.max, intensity.value, sport);
+      return speedTarget(
+        intensity.min,
+        intensity.max,
+        intensity.value,
+        sport,
+        unitSystem,
+      );
     }
 
     case WORKOUT_TARGET_TYPE.CADENCE: {
@@ -344,14 +387,17 @@ function mapTransitions(step: WorkoutStepDto): SuuntoTransition[] {
 }
 
 /** The step's length in words, for the conditions the watch cannot check */
-function describeDuration(step: WorkoutStepDto): string | null {
+function describeDuration(
+  step: WorkoutStepDto,
+  unitSystem: UnitSystem = 'METRIC',
+): string | null {
   const value = positive(step.durationValue);
   if (value === null) return null;
   switch (step.durationType) {
     case WORKOUT_DURATION_TYPE.TIME:
       return formatClock(value);
     case WORKOUT_DURATION_TYPE.DISTANCE:
-      return formatDistance(value);
+      return formatDistance(value, unitSystem);
     case WORKOUT_DURATION_TYPE.CALORIES:
       return `${Math.round(value)} kcal`;
     case WORKOUT_DURATION_TYPE.HR_ABOVE:
@@ -439,7 +485,9 @@ function mapFieldsStep(
 
   // Shown for 20 seconds as the step starts: what to do, then any notes
   const text = truncateText(
-    [describeDuration(step), label, step.notes].filter(Boolean).join(' · '),
+    [describeDuration(step, context.unitSystem), label, step.notes]
+      .filter(Boolean)
+      .join(' · '),
     NOTIFICATION_TEXT_LENGTH,
   );
 
